@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+
+<body>
+    <div style="display: flex">
+        <button id="create_upstream"></button>
+        <div style="display: flex; flex-direction: column">
+            <button id="create_downstream"></button>
+            <input id="create_downstream_upstream_id"></input>
+        </div>
+        <button id="create_junction"></button>
+    </div>
+    <div class="hori">
+        <div id="messages" style="flex-grow: 3"></div>
+        <div id="upstreams"></div>
+        <div id="downstreams"></div>
+        <div id="junctions"></div>
+    </div>
+    <style>
+        .hori {
+            display: flex;
+        }
+
+        .hori>* {
+            flex-grow: 1;
+        }
+    </style>
+    <script>
+        main();
+
+        async function main() {
+            setup_button("create_upstream", create_upstream);
+            setup_button("create_downstream", create_downstream);
+            setup_button("create_junction");
+            const messages = await setup_event_list("messages");
+            await setup_event_list("upstreams", "/upstreams");
+            await setup_event_list("downstreams");
+            await setup_event_list("junctions");
+
+            const up = await create_upstream();
+            await create_downstream(up);
+            await fetch_post_json(`/upstream/${up}`, { message: "it does work"});
+        }
+
+        async function create_upstream() {
+            const response = await fetch('/upstream', { method: 'PUT' });
+            const [upstream_id] = await response.json();
+            log(`create_upstream ${upstream_id}`);
+            return upstream_id;
+        }
+
+        async function create_downstream(upstream_id) {
+            upstream_id = upstream_id || take_input_value('create_downstream_upstream_id') || null;
+            const response = await fetch_put_json('/downstream', { upstream_id });
+            const [downstream_id] = await response.json();
+            log(`create_downstream ${downstream_id}`);
+            await open_event_source(`/downstream/${downstream_id}`, (event) => {
+                append_span_br(messages, stringify_spaced(JSON.parse(event.data)));
+            });
+            return downstream_id;
+        }
+
+        function take_input_value(id) {
+            const input = document.getElementById(id);
+            const value = input.value;
+            input.value = "";
+            return value;
+        }
+
+        function fetch_put_json(url, body) {
+            return fetch(url, {
+                method: 'PUT', body: JSON.stringify(body), headers: {
+                    "Content-Type": "application/json"
+                }
+            })
+        }
+
+        function fetch_post_json(url, body) {
+            return fetch(url, {
+                method: 'POST', body: JSON.stringify(body), headers: {
+                    "Content-Type": "application/json"
+                }
+            })
+        }
+
+        function log(arg) {
+            append_span_br(messages, arg);
+        }
+
+        function setup_button(id, onclick) {
+            const btn = document.getElementById(id);
+            if (!btn.textContent) {
+                btn.textContent = id;
+            }
+            btn.onclick = onclick;
+            return btn;
+        }
+
+        async function setup_event_list(id, url) {
+            const div = document.getElementById(id);
+            if (div.children.length == 0) {
+                append_text_element(div, 'h4', id);
+            }
+            if (url) {
+                await open_event_source(url, (event) => {
+                    const event_line = stringify_spaced(JSON.parse(event.data));
+                    append_span_br(div, event_line);
+                });
+            }
+            return div;
+        }
+
+        function append_text_element(parent, tag, text) {
+            const el = document.createElement(tag);
+            el.textContent = text;
+            parent.appendChild(el);
+        }
+
+        function append_span_br(parent, text) {
+            append_text_element(parent, 'span', text);
+            parent.appendChild(document.createElement('br'));
+        }
+
+        function open_event_source(url, onmessage) {
+            return new Promise((resolve, reject) => {
+                const source = new EventSource(url);
+                source.onopen = (event) => resolve(source);
+                source.onerror = (event) => reject();
+                source.onmessage = onmessage;
+            });
+        }
+
+        function stringify_spaced(it) {
+            const json = JSON.stringify(it, null, 2);
+            return json.replace(/(\n|\s)+/g, ' ');
+        }
+    </script>
+</body>
+
+</html>

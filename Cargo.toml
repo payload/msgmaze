@@ -1,0 +1,15 @@
+[package]
+name = "msgmaze"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-web = "4"
+#actix-web-lab = "0.19.1"
+actix-web-lab = { path = "../actix-web-lab/actix-web-lab" }
+futures-util = "0.3.28"
+tokio-stream = { version = "0.1.14", features = ["sync"] }
+tokio = "1.33.0"
+serde = { version = "1", features = ["derive"] }
+uuid = { version = "1.4.1", features = ["v4", "rand", "serde"] }
+dashmap = "5.5.3"
